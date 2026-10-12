@@ -6,11 +6,17 @@
 <style>
   html, body, #map { margin: 0; height: 100%; }
   .basemap-toggle-btn { font: 700 10px sans-serif; letter-spacing: .5px; background: transparent; border: none; color: #333; cursor: pointer; }
+  .legend-ctrl { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
+  .legend-ctrl img { display: none; max-height: 70vh; max-width: calc(100vw - 20px); border-radius: 4px; box-shadow: 0 0 0 2px rgba(0,0,0,.1); }
+  .legend-ctrl.open img { display: block; }
+  .legend-ctrl .maplibregl-ctrl-group { background: #fff; }
+  .legend-btn { width: auto; padding: 0 10px; font: 700 10px sans-serif; letter-spacing: .5px; text-transform: uppercase; color: #333; }
 </style>
 <div id="map"></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/pmtiles@3.2.0/dist/pmtiles.js"></script>
 <script>
+const LEGEND = 'legend.png';  // shipped in public/, served from the site root
 // Public client-side key (same as cogniscient), locked to allowed origins in MapTiler.
 const KEY = 'ZUYgDOuttJIaWHdE632Y';
 const BASEMAPS = { Map: 'dataviz-light', Satellite: 'hybrid' };  // hybrid = satellite + place labels
@@ -44,19 +50,42 @@ map.addControl({  // basemap toggle, same model as cogniscient: a button in a to
   onRemove() { this.el.remove(); },
 }, 'top-right');
 
+map.addControl({  // bottom-left button that shows/hides the legend image
+  onAdd() {
+    this.el = document.createElement('div'); this.el.className = 'maplibregl-ctrl legend-ctrl';
+    const img = this.el.appendChild(document.createElement('img'));
+    img.src = LEGEND; img.alt = 'Legend';
+    const group = this.el.appendChild(document.createElement('div')); group.className = 'maplibregl-ctrl-group';
+    const btn = group.appendChild(document.createElement('button'));
+    btn.type = 'button'; btn.className = 'legend-btn'; btn.textContent = 'Legend'; btn.title = 'Show legend';
+    btn.onclick = () => btn.title = this.el.classList.toggle('open') ? 'Hide legend' : 'Show legend';
+    return this.el;
+  },
+  onRemove() { this.el.remove(); },
+}, 'bottom-left');
+
 let coastlines;  // load our styles before the first basemap so style.load always has them
 fetch('styles.json').then(r => r.json()).then(s => { coastlines = s; return basemap('Satellite'); })
   .then(style => map.setStyle(style, { diff: false }));
 
+const PMTILES = {  // same layers and styling, one source per file
+  coastlines: 'https://files.auspatious.com/coastlines/final/vietnam_coastlines_0.8.3.pmtiles',
+  islands: 'https://files.auspatious.com/coastlines/final/islands_0.8.3.pmtiles',
+};
+
 function add() {
   if (map.getSource('coastlines')) return;
-  map.addSource('coastlines', { type: 'vector', url: 'pmtiles://https://files.auspatious.com/coastlines/final/vietnam_coastlines_0.8.3.pmtiles' });
   // Lines/circles go beneath the basemap's place labels; our own year/rate labels stay on top.
   const firstLabel = map.getStyle().layers.find(l => l.type === 'symbol')?.id;
-  // Noto Sans Regular exists on both MapTiler's and demotiles' glyph servers.
-  coastlines.layers.forEach(l => map.addLayer(
-    l.type === 'symbol' ? { ...l, layout: { ...l.layout, 'text-font': ['Noto Sans Regular'] } } : l,
-    l.type === 'symbol' ? undefined : firstLabel));
+  for (const [source, url] of Object.entries(PMTILES)) {
+    map.addSource(source, { type: 'vector', url: `pmtiles://${url}` });
+    // Noto Sans Regular exists on both MapTiler's and demotiles' glyph servers.
+    coastlines.layers.forEach(l => map.addLayer(
+      l.type === 'symbol'
+        ? { ...l, id: `${l.id} (${source})`, source, layout: { ...l.layout, 'text-font': ['Noto Sans Regular'] } }
+        : { ...l, id: `${l.id} (${source})`, source },
+      l.type === 'symbol' ? undefined : firstLabel));
+  }
 }
 map.on('style.load', add);
 map.on('error', e => console.error('map error:', e.error));  // a listener suppresses MapLibre's default logging
