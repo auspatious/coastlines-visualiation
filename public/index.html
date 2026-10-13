@@ -21,7 +21,7 @@
 const LEGEND = 'legend.png';  // shipped in public/, served from the site root
 // Public client-side key (same as cogniscient), locked to allowed origins in MapTiler.
 const KEY = 'ZUYgDOuttJIaWHdE632Y';
-const BASEMAPS = { Map: 'dataviz-light', Satellite: 'hybrid' };  // hybrid = satellite + place labels
+const BASEMAPS = { Map: 'aquarelle-v4', Satellite: 'satellite-v4' };
 const OSM = { version: 8, sources: { osm: { type: 'raster', tileSize: 256, attribution: '© OpenStreetMap',
   tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'] } }, layers: [{ id: 'osm', type: 'raster', source: 'osm' }] };
 // OSM has no glyphs of its own; MapTiler styles keep theirs.
